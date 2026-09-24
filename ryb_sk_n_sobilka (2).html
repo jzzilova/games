@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Petrův Zdar: Rybářská Násobilka</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body {
+      font-family: 'Nunito', sans-serif;
+      touch-action: manipulation;
+      overscroll-behavior: none;
+    }
+    .font-game {
+      font-family: 'Fredoka', cursive, sans-serif;
+    }
+    .wood-panel {
+      background: linear-gradient(180deg, #45220a 0%, #291202 100%);
+      box-shadow: inset 0 1.5px 1px rgba(255,255,255,0.2), 0 4px 12px rgba(0,0,0,0.6);
+    }
+    .wood-badge {
+      background: linear-gradient(180deg, #5c2c0d 0%, #351603 100%);
+      border: 1.5px solid #d97706;
+    }
+    @keyframes pulseAlert {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.04); opacity: 0.88; }
+    }
+    .alert-pulse {
+      animation: pulseAlert 1.1s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-800 h-screen w-screen overflow-hidden flex flex-col select-none">
+
+  <!-- TOP HUD WOODEN BAR (Responsive & Mobile-first) -->
+  <header class="h-14 sm:h-16 wood-panel text-amber-100 flex items-center justify-between px-2 sm:px-5 z-20 shrink-0 border-b-2 sm:border-b-4 border-amber-950">
+    <!-- Expedition Info -->
+    <div class="flex items-center gap-1.5 sm:gap-3 min-w-0">
+      <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-amber-950/80 border border-amber-500/60 flex items-center justify-center text-lg sm:text-2xl shadow shrink-0">
+        🎣
+      </div>
+      <div class="truncate">
+        <div class="flex items-center gap-1">
+          <span id="hud-location-icon" class="text-xs sm:text-base">🏞️</span>
+          <h1 id="hud-location-name" class="font-game text-xs sm:text-sm md:text-base font-bold text-amber-200 truncate leading-tight">1. Rožmberk</h1>
+        </div>
+        <div class="text-[10px] sm:text-xs text-amber-300/90 font-bold" id="hud-mission-progress">Úlovek: 0 / 6</div>
+      </div>
+    </div>
+
+    <!-- Active Equation Box -->
+    <div id="hud-equation-card" class="bg-amber-950/95 px-3 sm:px-5 py-0.5 sm:py-1 rounded-xl sm:rounded-2xl border-2 border-amber-400 shadow-xl flex items-center gap-1.5 mx-1 shrink-0">
+      <span class="text-[10px] uppercase text-amber-300 font-bold hidden md:inline">Záběr:</span>
+      <span id="hud-equation" class="font-game text-xl sm:text-2xl md:text-3xl font-extrabold text-amber-300 tracking-wider">3 × 4 = ?</span>
+    </div>
+
+    <!-- Lives, Combo & Controls -->
+    <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+      <div class="wood-badge px-2 sm:px-3 py-1 rounded-xl flex items-center gap-1.5 text-xs sm:text-sm font-bold shadow">
+        <span id="hud-lives" class="text-sm sm:text-base tracking-wider" title="Životy (2 chyby = konec)">❤️❤️</span>
+        <span class="text-amber-600/70 hidden xs:inline">|</span>
+        <span class="hidden xs:inline" title="Série bez chyby">🔥 <strong id="hud-streak" class="text-amber-300">0</strong></span>
+      </div>
+
+      <button id="btn-journal" class="wood-badge hover:brightness-110 active:scale-95 text-amber-200 font-bold px-2 sm:px-3 py-1 rounded-xl text-xs sm:text-sm transition flex items-center gap-1" title="Atlas ryb">
+        <span>📖</span>
+      </button>
+
+      <button id="btn-mute" class="wood-badge hover:brightness-110 active:scale-95 text-amber-200 font-bold p-1 sm:p-1.5 rounded-xl text-xs sm:text-sm transition" title="Zvuk">
+        🔊
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CANVAS PLAY AREA -->
+  <main class="relative flex-1 w-full h-full overflow-hidden bg-slate-900 cursor-crosshair">
+    <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+
+    <!-- Expedition Tracker Badge -->
+    <div class="absolute top-2 left-2 sm:top-3 sm:left-4 pointer-events-none z-10">
+      <div class="bg-slate-900/85 backdrop-blur-md px-2.5 sm:px-3.5 py-1 rounded-lg sm:rounded-xl border border-amber-500/40 text-amber-100 text-[11px] sm:text-xs font-bold shadow-lg flex items-center gap-1.5">
+        <span id="expedition-badge-icon">🏅</span>
+        <span id="expedition-status-text">Lov k Bossovi: 0 / 6</span>
+      </div>
+    </div>
+
+    <!-- Speed Combo Banner (5+ streak) -->
+    <div id="speed-banner" class="absolute top-2 right-2 sm:top-3 sm:right-4 bg-amber-500 text-slate-950 font-game font-extrabold px-2.5 sm:px-3.5 py-1 rounded-xl border border-yellow-200 shadow-xl z-10 transition-all duration-300 transform scale-0 pointer-events-none flex items-center gap-1 text-[11px] sm:text-xs">
+      <span>⚡ PROUD ZRYCHLIL! (Série 5+)</span>
+    </div>
+
+    <!-- Floating Notice Toast -->
+    <div id="notice-toast" class="absolute top-12 left-1/2 -translate-x-1/2 bg-amber-400 text-slate-950 px-4 py-1.5 rounded-2xl font-game font-bold text-xs sm:text-sm border-2 border-amber-100 shadow-2xl transition-all duration-300 transform -translate-y-8 opacity-0 pointer-events-none z-30 max-w-[90vw] text-center">
+      Zpráva
+    </div>
+
+    <!-- First Mistake Warning Banner -->
+    <div id="warning-strip" class="absolute bottom-3 left-1/2 -translate-x-1/2 bg-rose-950/95 text-rose-200 px-4 py-1.5 rounded-full border-2 border-rose-500 text-[11px] sm:text-xs font-bold shadow-2xl hidden alert-pulse z-20 text-center whitespace-nowrap">
+      ⚠️ Vlasec je načatý! Zbývá POSLEDNÍ ŽIVOT!
+    </div>
+
+    <!-- Boss Battle HUD Header -->
+    <div id="boss-hud" class="absolute top-12 left-1/2 -translate-x-1/2 w-11/12 max-w-sm bg-slate-950/95 backdrop-blur-md rounded-2xl border-2 border-cyan-400 p-2.5 shadow-2xl z-20 transition-all duration-300 hidden flex flex-col items-center">
+      <div class="flex items-center justify-between w-full mb-1">
+        <div class="flex items-center gap-1.5">
+          <span class="text-xl">👑</span>
+          <span id="boss-hud-name" class="font-game font-bold text-cyan-200 text-xs sm:text-sm">Zlatý Král Kapr</span>
+        </div>
+        <div id="boss-hud-stamina-text" class="text-xs font-bold text-cyan-300">Výdrž: 3 / 3</div>
+      </div>
+      <div class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden border border-cyan-600/50 p-0.5">
+        <div id="boss-stamina-bar" class="h-full bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full transition-all duration-300" style="width: 100%;"></div>
+      </div>
+      <div class="text-[10px] text-cyan-100/90 mt-1 font-semibold text-center">
+        Všechny bubliny mají stejnou barvu! Spočítej příklad a klikni na správnou!
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL: EXPEDITION BRIEFING -->
+  <div id="modal-mission" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-gradient-to-b from-amber-50 to-orange-100 w-full max-w-md rounded-3xl shadow-2xl border-4 border-amber-700 overflow-hidden flex flex-col">
+      <div class="wood-panel px-5 py-3.5 flex items-center gap-3 text-amber-100 border-b-2 border-amber-950">
+        <span id="brief-icon" class="text-3xl">🏞️</span>
+        <div>
+          <div class="text-[10px] font-bold uppercase text-amber-300 tracking-wider">Výprava za českými rybami</div>
+          <h2 id="brief-title" class="font-game text-base sm:text-lg font-bold text-amber-100">1. Rybník Rožmberk</h2>
+        </div>
+      </div>
+
+      <div class="p-4 sm:p-5 space-y-3 text-slate-800">
+        <p id="brief-desc" class="text-xs sm:text-sm leading-relaxed text-slate-700">
+          Popis lokace.
+        </p>
+
+        <div class="grid grid-cols-2 gap-2 text-xs font-bold">
+          <div class="bg-white/85 p-2.5 rounded-xl border border-amber-300 flex items-center gap-2">
+            <span class="text-xl">🎯</span>
+            <div>
+              <div class="text-slate-500 text-[9px] uppercase">Cíl k Bossovi</div>
+              <div id="brief-target" class="text-emerald-800 font-extrabold">Ulov 6 ryb</div>
+            </div>
+          </div>
+          <div class="bg-white/85 p-2.5 rounded-xl border border-amber-300 flex items-center gap-2">
+            <span class="text-xl">📐</span>
+            <div>
+              <div class="text-slate-500 text-[9px] uppercase">Násobilka</div>
+              <div id="brief-tables" class="text-amber-800 font-extrabold">2, 3, 4, 5</div>
+            </div>
+          </div>
+          <div class="col-span-2 bg-amber-200/70 p-2.5 rounded-xl border border-amber-400 flex items-center gap-2.5">
+            <span class="text-2xl">👑</span>
+            <div>
+              <div class="text-amber-900 text-[9px] uppercase font-bold">Čekající Boss</div>
+              <div id="brief-boss-name" class="text-slate-900 font-extrabold text-xs sm:text-sm">Král Rožmberka</div>
+              <div id="brief-boss-desc" class="text-[11px] text-slate-600 font-medium">3 přesné zásahy k ulovení.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-3 bg-amber-200/50 border-t border-amber-300 flex justify-end">
+        <button id="btn-start-mission" class="w-full sm:w-auto bg-emerald-700 hover:bg-emerald-600 active:scale-95 text-white font-game text-sm sm:text-base font-bold px-6 py-2.5 rounded-xl shadow-lg border border-emerald-500 transition flex items-center justify-center gap-2">
+          <span>Nahodit prut!</span> <span>🎣</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: STRICT GAME OVER (After 2nd mistake) -->
+  <div id="modal-gameover" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-gradient-to-b from-stone-900 to-slate-950 w-full max-w-sm rounded-3xl shadow-2xl border-4 border-rose-600 p-5 text-center space-y-3.5 text-white">
+      <div class="w-14 h-14 bg-rose-600/20 border-2 border-rose-500 rounded-full flex items-center justify-center text-3xl mx-auto">
+        💥
+      </div>
+      <div>
+        <h3 class="font-game text-2xl font-black text-rose-400">Přetržený vlasec!</h3>
+        <p class="text-xs text-slate-300 mt-1">
+          Druhá chyba znamenala ztrátu ryby i háčku. Lov v této tůni skončil!
+        </p>
+      </div>
+
+      <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700 grid grid-cols-2 gap-2 text-left font-bold text-xs">
+        <div>🐟 Celkem úlovků: <span id="go-catches" class="text-amber-400 font-extrabold">0</span></div>
+        <div>🔥 Nej série: <span id="go-streak" class="text-emerald-400 font-extrabold">0</span></div>
+        <div class="col-span-2">📍 Výprava: <span id="go-location" class="text-cyan-300 font-extrabold">1. Rožmberk</span></div>
+      </div>
+
+      <!-- Action Button requested by User -->
+      <button id="btn-gameover-restart" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-game font-bold text-base rounded-xl shadow-xl transition border-2 border-emerald-400 flex items-center justify-center gap-2">
+        <span>Chci na další výpravu</span> <span>🎣</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL: CAMPAIGN VICTORY -->
+  <div id="modal-victory" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-gradient-to-b from-amber-50 to-orange-100 w-full max-w-md rounded-3xl shadow-2xl border-4 border-amber-600 p-5 text-center space-y-3.5">
+      <div class="text-5xl animate-bounce">🏆</div>
+      <h3 class="font-game text-2xl font-black text-amber-900 leading-tight">Mimořádný rybářský triumf!</h3>
+      <p class="text-xs text-slate-700">Přemohl jsi legendárního sumce Pepu a ovládl celou malou násobilku!</p>
+
+      <div class="bg-white/90 p-3 rounded-xl border border-amber-300 grid grid-cols-2 gap-2 text-slate-800 text-left font-bold text-xs">
+        <div>🐟 Celkem ryb: <span id="win-catches" class="text-emerald-700 font-extrabold">0</span></div>
+        <div>👑 Poražení bossové: <span class="text-amber-700 font-extrabold">4 / 4</span></div>
+        <div>🔥 Rekord série: <span id="win-streak" class="text-orange-600 font-extrabold">0</span></div>
+        <div>🎖️ Dosažená třída: <span class="text-indigo-800 font-extrabold">Císařský Porybný</span></div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-2 pt-1">
+        <!-- Action Button requested by User -->
+        <button id="btn-win-restart" class="flex-1 py-2.5 bg-emerald-700 hover:bg-emerald-600 active:scale-95 text-white font-game font-bold text-sm rounded-xl shadow-lg transition">
+          Chci na další výpravu 🎣
+        </button>
+        <button id="btn-win-journal" class="flex-1 py-2.5 bg-amber-700 hover:bg-amber-600 active:scale-95 text-white font-game font-bold text-sm rounded-xl shadow-lg transition">
+          Atlas ryb 📖
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: FISH ATLAS / JOURNAL -->
+  <div id="modal-journal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-slate-50 w-full max-w-2xl rounded-3xl shadow-2xl border-4 border-amber-700 max-h-[85vh] flex flex-col overflow-hidden">
+      <div class="wood-panel px-4 sm:px-6 py-3 flex items-center justify-between text-amber-100 border-b-2 border-amber-950">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">📖</span>
+          <h2 class="font-game text-base sm:text-lg font-bold">Atlas ryb České republiky</h2>
+        </div>
+        <button id="btn-close-journal" class="w-7 h-7 rounded-full bg-amber-900 hover:bg-amber-800 flex items-center justify-center font-bold text-base leading-none transition">✕</button>
+      </div>
+      <div class="p-4 sm:p-5 overflow-y-auto space-y-3">
+        <div id="journal-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AUDIO ENGINE -->
+  <script>
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+      toggleMute() {
+        this.muted = !this.muted;
+        return this.muted;
+      }
+      playSplash() {
+        if (this.muted) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const bufferSize = Math.floor(this.ctx.sampleRate * 0.25);
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(850, now);
+        filter.frequency.exponentialRampToValueAtTime(140, now + 0.24);
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.24);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        noise.start(now);
+      }
+      playCatch() {
+        if (this.muted) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.05);
+          gain.gain.setValueAtTime(0.001, now + idx * 0.05);
+          gain.gain.linearRampToValueAtTime(0.2, now + idx * 0.05 + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.22);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.05);
+          osc.stop(now + idx * 0.05 + 0.24);
+        });
+      }
+      playMistake() {
+        if (this.muted) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(80, now + 0.32);
+        gain.gain.setValueAtTime(0.32, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.32);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.33);
+      }
+      playGameOver() {
+        if (this.muted) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        [220, 196, 174, 130].forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.11);
+          gain.gain.setValueAtTime(0.25, now + idx * 0.11);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.11 + 0.18);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.11);
+          osc.stop(now + idx * 0.11 + 0.2);
+        });
+      }
+      playBossHit() {
+        if (this.muted) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(190, now);
+        osc.frequency.exponentialRampToValueAtTime(50, now + 0.35);
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.36);
+      }
+      playCast() {
+        if (this.muted) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.exponentialRampToValueAtTime(900, now + 0.1);
+        gain.gain.setValueAtTime(0.01, now);
+        gain.gain.linearRampToValueAtTime(0.12, now + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.2);
+      }
+    }
+    const sound = new SoundEngine();
+  </script>
+
+  <!-- DATABASE & STATE -->
+  <script>
+    const EXPEDITIONS = [
+      {
+        id: 1,
+        name: "Rybník Rožmberk",
+        icon: "🏞️",
+        theme: "pond",
+        tables: [2, 3, 4, 5],
+        requiredCatches: 6,
+        description: "Jihočeská kolébka rybníkářství. Klidné vody a základy malé násobilky čísel 2, 3, 4 a 5.",
+        boss: {
+          name: "Zlatý Kapr Král Rožmberka",
+          stamina: 3,
+          maxStamina: 3,
+          color: "#d97706",
+          accentColor: "#facc15",
+          bellyColor: "#fef08a",
+          description: "Prastarý kapr se zlatými šupinami."
+        }
+      },
+      {
+        id: 2,
+        name: "Řeka Sázava",
+        icon: "🌊",
+        theme: "river",
+        tables: [6, 7],
+        requiredCatches: 6,
+        description: "Rychlý proud a peřeje prověří násobilku 6 a 7.",
+        boss: {
+          name: "Zelená Šavlozubá Štika",
+          stamina: 3,
+          maxStamina: 3,
+          color: "#2d5a27",
+          accentColor: "#65a30d",
+          bellyColor: "#ecfccb",
+          description: "Blesková dravá královna říční tůně."
+        }
+      },
+      {
+        id: 3,
+        name: "Přehrada Lipno (Noc)",
+        icon: "🌙",
+        theme: "night",
+        tables: [8, 9],
+        requiredCatches: 6,
+        description: "Tmavá hladina jihočeského moře. Ryby se svítícíma očima a nejtěžší řady 8 a 9.",
+        boss: {
+          name: "Obří Hlubinný Candát",
+          stamina: 3,
+          maxStamina: 3,
+          color: "#475569",
+          accentColor: "#94a3b8",
+          bellyColor: "#f8fafc",
+          description: "Rytíř nočních hlubin Lipna."
+        }
+      },
+      {
+        id: 4,
+        name: "Pod Vyšehradem",
+        icon: "🏰",
+        theme: "deep",
+        tables: [2, 3, 4, 5, 6, 7, 8, 9], // Full multiplication table
+        requiredCatches: 7,
+        description: "Královská výprava v Praze. Kombinuje celou násobilku 2 až 9 bez úlev!",
+        boss: {
+          name: "Legendární Sumec Pepa",
+          stamina: 4,
+          maxStamina: 4,
+          color: "#1e293b",
+          accentColor: "#334155",
+          bellyColor: "#64748b",
+          description: "Bájný sumec vážící přes 70 kg!"
+        }
+      }
+    ];
+
+    const SPECIES_DATABASE = [
+      { id: 'kapr', name: 'Kapr obecný', scientific: 'Cyprinus carpio', minLen: 38, maxLen: 85, color: '#b45309', accentColor: '#f59e0b', bellyColor: '#fef3c7', fact: 'Nejznámější česká ryba a král jihočeských rybníků.' },
+      { id: 'stika', name: 'Štika obecná', scientific: 'Esox lucius', minLen: 50, maxLen: 110, color: '#3f6212', accentColor: '#84cc16', bellyColor: '#f7fee7', fact: 'Bleskový říční lovec s tlamou plnou ostrých zubů.' },
+      { id: 'okoun', name: 'Okoun říční', scientific: 'Perca fluviatilis', minLen: 18, maxLen: 42, color: '#166534', accentColor: '#ea580c', bellyColor: '#f0fdf4', fact: 'Pruhovaný krasavec s ostnatou hřbetní ploutví.' },
+      { id: 'candat', name: 'Candát obecný', scientific: 'Sander lucioperca', minLen: 45, maxLen: 92, color: '#475569', accentColor: '#94a3b8', bellyColor: '#f1f5f9', fact: 'Ceněný noční dravec se svítícíma očima v šeru.' },
+      { id: 'sumec', name: 'Sumec velký', scientific: 'Silurus glanis', minLen: 70, maxLen: 220, color: '#1e293b', accentColor: '#475569', bellyColor: '#94a3b8', fact: 'Největší sladkovodní ryba v ČR s dlouhými vousy.' },
+      { id: 'pstruh', name: 'Pstruh potoční', scientific: 'Salmo trutta m. fario', minLen: 22, maxLen: 46, color: '#78350f', accentColor: '#ef4444', bellyColor: '#fffbeb', fact: 'Klenot čistých horských a podhorských bystřin.' },
+      { id: 'lin', name: 'Lín obecný', scientific: 'Tinca tinca', minLen: 25, maxLen: 50, color: '#3f6212', accentColor: '#ca8a04', bellyColor: '#fef9c3', fact: 'Ryba se sametově zelenou kůží a oranžovýma očima.' }
+    ];
+
+    const caughtLog = {};
+    SPECIES_DATABASE.forEach(s => caughtLog[s.id] = 0);
+  </script>
+
+  <!-- CANVAS AND FISH LOGIC -->
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let logicalWidth = 0;
+    let logicalHeight = 0;
+    let pixelRatio = 1;
+
+    // Strict 2-Lives System
+    let lives = 2; // 2 -> ❤️❤️, 1 -> ❤️🖤, 0 -> Game Over
+    let currentStreak = 0;
+    let maxStreak = 0;
+    let totalCatches = 0;
+    let speedMultiplier = 1.0;
+
+    // Campaign Progression
+    let currentExpeditionIndex = 0;
+    let missionCatches = 0;
+    let isBossFightActive = false;
+    let currentBoss = null;
+
+    // Equation with anti-consecutive duplicate memory
+    let currentEquation = {
+      factorA: 3,
+      factorB: 4,
+      answer: 12
+    };
+    let lastEquationFactors = null; // { a: 3, b: 4 }
+
+    let fishes = [];
+    let castAnimation = null;
+    let waterWaveOffset = 0;
+
+    function resize() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      logicalWidth = rect.width;
+      logicalHeight = rect.height;
+      pixelRatio = window.devicePixelRatio || 1;
+
+      canvas.width = Math.floor(logicalWidth * pixelRatio);
+      canvas.height = Math.floor(logicalHeight * pixelRatio);
+      ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    }
+    window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', () => setTimeout(resize, 150));
+    resize();
+
+    class Fish {
+      constructor(species, forceSide, initialX) {
+        this.species = species;
+        this.value = 0;
+        this.isCorrect = false;
+        this.lengthCm = Math.floor(Math.random() * (species.maxLen - species.minLen + 1)) + species.minLen;
+
+        // Mobile responsiveness: adjust fish size slightly based on screen width
+        const scaleMod = logicalWidth < 640 ? 0.85 : 1.0;
+        this.baseWidth = (110 + (this.lengthCm / 100) * 45) * scaleMod;
+        this.baseHeight = this.baseWidth * 0.44;
+
+        this.y = 80 + Math.random() * Math.max(100, logicalHeight - 190);
+        this.direction = forceSide !== undefined ? forceSide : (Math.random() > 0.5 ? 1 : -1);
+
+        if (initialX !== undefined) {
+          this.x = initialX;
+        } else {
+          this.x = this.direction === 1 ? -this.baseWidth - 30 : logicalWidth + this.baseWidth + 30;
+        }
+
+        const expBonus = currentExpeditionIndex === 1 ? 0.35 : 0;
+        this.baseSpeed = 0.85 + Math.random() * 0.65 + expBonus;
+        this.wigglePhase = Math.random() * Math.PI * 2;
+        this.wiggleSpeed = 0.06;
+
+        this.isHooked = false;
+        this.isFleeing = false;
+      }
+
+      flee() {
+        this.isFleeing = true;
+      }
+
+      update() {
+        if (this.isHooked) {
+          this.y -= 9;
+          this.x += (logicalWidth * 0.5 - this.x) * 0.07;
+          return;
+        }
+
+        if (this.isFleeing) {
+          this.x += this.direction * 11;
+          return;
+        }
+
+        const speed = this.baseSpeed * this.direction * speedMultiplier;
+        this.x += speed;
+        this.wigglePhase += this.wiggleSpeed * speedMultiplier;
+
+        // Wrap around margins
+        if (this.direction === 1 && this.x > logicalWidth + this.baseWidth + 40) {
+          this.x = -this.baseWidth - 20;
+          this.y = 80 + Math.random() * Math.max(100, logicalHeight - 190);
+        } else if (this.direction === -1 && this.x < -this.baseWidth - 40) {
+          this.x = logicalWidth + this.baseWidth + 20;
+          this.y = 80 + Math.random() * Math.max(100, logicalHeight - 190);
+        }
+      }
+
+      // Mobile Touch optimization: generous hit target for fingers
+      contains(px, py) {
+        if (this.isHooked || this.isFleeing) return false;
+
+        // Expanded ellipse for comfortable finger touches
+        const dx = (px - this.x) / (this.baseWidth * 0.65);
+        const dy = (py - this.y) / (this.baseHeight * 0.85);
+        const hitBody = (dx * dx + dy * dy) <= 1.35;
+
+        // Generous math bubble touch box
+        const bubbleY = this.y - this.baseHeight * 0.72;
+        const hitBubble = Math.abs(px - this.x) <= 38 && Math.abs(py - bubbleY) <= 32;
+
+        return hitBody || hitBubble;
+      }
+
+      draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y + Math.sin(this.wigglePhase) * 4);
+        if (this.direction === -1) ctx.scale(-1, 1);
+
+        const w = this.baseWidth;
+        const h = this.baseHeight;
+        const tail = Math.sin(this.wigglePhase * 1.8) * 6;
+
+        // Tail fin
+        ctx.fillStyle = this.species.accentColor;
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.38, 0);
+        ctx.quadraticCurveTo(-w * 0.55, -h * 0.6 + tail, -w * 0.62, -h * 0.55 + tail);
+        ctx.quadraticCurveTo(-w * 0.48, tail * 0.5, -w * 0.62, h * 0.55 + tail);
+        ctx.quadraticCurveTo(-w * 0.55, h * 0.6 + tail, -w * 0.38, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        // Main body
+        const grad = ctx.createLinearGradient(0, -h * 0.5, 0, h * 0.5);
+        grad.addColorStop(0, this.species.color);
+        grad.addColorStop(0.7, this.species.color);
+        grad.addColorStop(1, this.species.bellyColor);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(w * 0.45, 0);
+        ctx.bezierCurveTo(w * 0.25, -h * 0.6, -w * 0.25, -h * 0.5, -w * 0.4, 0);
+        ctx.bezierCurveTo(-w * 0.25, h * 0.55, w * 0.2, h * 0.5, w * 0.45, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        // Special species markings
+        if (this.species.id === 'okoun') {
+          ctx.strokeStyle = 'rgba(20, 45, 20, 0.45)';
+          ctx.lineWidth = 3;
+          for (let i = -0.15; i <= 0.2; i += 0.12) {
+            ctx.beginPath();
+            ctx.moveTo(w * i, -h * 0.38);
+            ctx.lineTo(w * (i - 0.05), h * 0.2);
+            ctx.stroke();
+          }
+        } else if (this.species.id === 'pstruh') {
+          ctx.fillStyle = '#ef4444';
+          for (let s = -0.2; s < 0.2; s += 0.09) {
+            ctx.beginPath();
+            ctx.arc(w * s, -h * 0.04 + ((s * 10) % 5), 2.2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        // Night theme: glowing eyes for Lipno expedition
+        const isNight = EXPEDITIONS[currentExpeditionIndex].theme === 'night';
+        ctx.fillStyle = isNight ? '#fde047' : '#ffffff';
+        ctx.beginPath();
+        ctx.arc(w * 0.32, -h * 0.12, 5.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = isNight ? '#dc2626' : '#0f172a';
+        ctx.beginPath();
+        ctx.arc(w * 0.34, -h * 0.12, 2.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+
+        // Draw Math Bubble
+        if (!this.isHooked && !this.isFleeing) {
+          const bubbleY = this.y - this.baseHeight * 0.72;
+          ctx.save();
+          ctx.shadowColor = 'rgba(0,0,0,0.3)';
+          ctx.shadowBlur = 6;
+          ctx.fillStyle = isNight ? '#0f172a' : '#ffffff';
+          ctx.strokeStyle = isNight ? '#38bdf8' : '#0284c7';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.roundRect(this.x - 27, bubbleY - 17, 54, 34, 12);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = isNight ? '#38bdf8' : '#0f172a';
+          ctx.font = 'bold 18px "Fredoka", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(this.value.toString(), this.x, bubbleY + 1);
+          ctx.restore();
+        }
+      }
+    }
+
+    class BossCreature {
+      constructor(bossData) {
+        this.data = bossData;
+        this.stamina = bossData.stamina;
+        this.maxStamina = bossData.maxStamina;
+        this.x = logicalWidth * 0.5;
+        this.y = logicalHeight * 0.54;
+        this.phase = 0;
+        const scaleMod = logicalWidth < 640 ? 0.8 : 1.0;
+        this.w = 260 * scaleMod;
+        this.h = 115 * scaleMod;
+        this.answers = [];
+      }
+
+      update() {
+        this.phase += 0.028;
+        this.y = logicalHeight * 0.54 + Math.sin(this.phase) * 14;
+        this.x = logicalWidth * 0.5 + Math.cos(this.phase * 0.7) * 20;
+
+        const orbitRadiusX = logicalWidth < 640 ? 125 : 175;
+        const orbitRadiusY = logicalWidth < 640 ? 65 : 85;
+
+        this.answers.forEach((ans, i) => {
+          const orbitAngle = this.phase * 1.05 + (i * (Math.PI * 2 / this.answers.length));
+          ans.x = this.x + Math.cos(orbitAngle) * orbitRadiusX;
+          ans.y = this.y + Math.sin(orbitAngle) * orbitRadiusY;
+        });
+      }
+
+      draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+
+        const pulse = (Math.sin(this.phase * 2) + 1) * 0.5;
+        ctx.shadowColor = 'rgba(6, 182, 212, ' + (0.4 + pulse * 0.4) + ')';
+        ctx.shadowBlur = 28;
+
+        const grad = ctx.createLinearGradient(0, -this.h * 0.5, 0, this.h * 0.5);
+        grad.addColorStop(0, this.data.color);
+        grad.addColorStop(0.7, this.data.color);
+        grad.addColorStop(1, this.data.bellyColor);
+        ctx.fillStyle = grad;
+
+        // Big Boss Silhouette
+        ctx.beginPath();
+        ctx.moveTo(this.w * 0.48, 0);
+        ctx.bezierCurveTo(this.w * 0.25, -this.h * 0.7, -this.w * 0.3, -this.h * 0.6, -this.w * 0.48, 0);
+        ctx.bezierCurveTo(-this.w * 0.3, this.h * 0.65, this.w * 0.2, this.h * 0.6, this.w * 0.48, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        // Boss Tail & Fins
+        ctx.fillStyle = this.data.accentColor;
+        ctx.beginPath();
+        ctx.moveTo(-this.w * 0.45, 0);
+        ctx.lineTo(-this.w * 0.7, -this.h * 0.5);
+        ctx.lineTo(-this.w * 0.55, 0);
+        ctx.lineTo(-this.w * 0.7, this.h * 0.5);
+        ctx.closePath();
+        ctx.fill();
+
+        // Crown on Boss Head
+        ctx.fillStyle = '#facc15';
+        ctx.strokeStyle = '#ca8a04';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(this.w * 0.22, -this.h * 0.55);
+        ctx.lineTo(this.w * 0.25, -this.h * 0.75);
+        ctx.lineTo(this.w * 0.3, -this.h * 0.6);
+        ctx.lineTo(this.w * 0.35, -this.h * 0.8);
+        ctx.lineTo(this.w * 0.4, -this.h * 0.55);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Boss Eye
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath();
+        ctx.arc(this.w * 0.34, -this.h * 0.15, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#dc2626';
+        ctx.beginPath();
+        ctx.arc(this.w * 0.36, -this.h * 0.15, 5.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+
+        // REQ 2: IDENTICAL COLOR AND STYLE FOR ALL 3 BUBBLES (No visual leaks)
+        this.answers.forEach(ans => {
+          ctx.save();
+          // Identical shadow
+          ctx.shadowColor = 'rgba(6, 182, 212, 0.6)';
+          ctx.shadowBlur = 12;
+
+          // Rich pearl-cyan sphere gradient
+          const radGrad = ctx.createRadialGradient(ans.x - 7, ans.y - 7, 3, ans.x, ans.y, 28);
+          radGrad.addColorStop(0, '#ffffff');
+          radGrad.addColorStop(0.3, '#cffafe');
+          radGrad.addColorStop(0.7, '#06b6d4');
+          radGrad.addColorStop(1, '#0891b2');
+
+          ctx.fillStyle = radGrad;
+          ctx.strokeStyle = '#e0f2fe';
+          ctx.lineWidth = 3;
+
+          ctx.beginPath();
+          ctx.arc(ans.x, ans.y, 28, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          // Subtle reflection arc
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(ans.x - 6, ans.y - 6, 14, Math.PI * 1.05, Math.PI * 1.6);
+          ctx.stroke();
+
+          // Identical deep text style
+          ctx.fillStyle = '#082f49';
+          ctx.font = 'bold 22px "Fredoka", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(ans.value.toString(), ans.x, ans.y + 1);
+          ctx.restore();
+        });
+      }
+
+      checkHit(px, py) {
+        // Mobile-friendly tap radius (36px instead of 28px)
+        for (let i = 0; i < this.answers.length; i++) {
+          const ans = this.answers[i];
+          const dist = Math.hypot(px - ans.x, py - ans.y);
+          if (dist <= 36) return ans;
+        }
+        return null;
+      }
+    }
+  </script>
+
+  <!-- EQUATION ENGINE & ANTI-DUPLICATION -->
+  <script>
+    function showToast(message, isWarning = false) {
+      const toast = document.getElementById('notice-toast');
+      toast.textContent = message;
+      toast.className = `absolute top-12 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-2xl font-game font-bold text-xs sm:text-sm border-2 shadow-2xl transition-all duration-300 pointer-events-none z-30 max-w-[90vw] text-center ${isWarning ? 'bg-rose-600 text-white border-rose-300' : 'bg-amber-400 text-slate-950 border-amber-100'}`;
+      toast.style.opacity = '1';
+      toast.style.transform = 'translate(-50%, 0)';
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translate(-50%, -20px)';
+      }, 1800);
+    }
+
+    // REQ 1: PREVENT CONSECUTIVE DUPLICATE EQUATIONS
+    function generateNewEquation() {
+      const exp = EXPEDITIONS[currentExpeditionIndex];
+      const pool = exp.tables;
+
+      let factorA, factorB;
+      let attempts = 0;
+
+      do {
+        factorA = pool[Math.floor(Math.random() * pool.length)];
+        factorB = Math.floor(Math.random() * 9) + 2; // 2 to 10
+        attempts++;
+      } while (
+        lastEquationFactors !== null &&
+        factorA === lastEquationFactors.a &&
+        factorB === lastEquationFactors.b &&
+        attempts < 50
+      );
+
+      // Save for next turn comparison
+      lastEquationFactors = { a: factorA, b: factorB };
+      const answer = factorA * factorB;
+
+      currentEquation = { factorA, factorB, answer };
+      document.getElementById('hud-equation').textContent = `${factorA} × ${factorB} = ?`;
+
+      if (isBossFightActive && currentBoss) {
+        prepareBossAnswers();
+      } else {
+        syncFishPoolAnswers();
+      }
+    }
+
+    function prepareBossAnswers() {
+      const target = currentEquation.answer;
+      const used = new Set([target]);
+      const answers = [{ value: target, isTarget: true, x: 0, y: 0 }];
+
+      while (answers.length < 3) {
+        const offset = (Math.floor(Math.random() * 5) - 2) * currentEquation.factorA;
+        let dist = target + (offset !== 0 ? offset : (Math.random() > 0.5 ? 3 : -3));
+        if (dist <= 0 || used.has(dist)) {
+          dist = Math.floor(Math.random() * 80) + 2;
+        }
+        if (!used.has(dist)) {
+          used.add(dist);
+          answers.push({ value: dist, isTarget: false, x: 0, y: 0 });
+        }
+      }
+      currentBoss.answers = answers.sort(() => Math.random() - 0.5);
+    }
+
+    // Deterministic distribution: EXACTLY ONE visible active fish gets currentEquation.answer
+    function syncFishPoolAnswers() {
+      const activeFishes = fishes.filter(f => !f.isHooked && !f.isFleeing);
+      if (activeFishes.length === 0) return;
+
+      // Select candidate best positioned inside visible screen
+      let targetFish = activeFishes.find(f => f.x > 60 && f.x < logicalWidth - 60);
+      if (!targetFish) targetFish = activeFishes[0];
+
+      const target = currentEquation.answer;
+      const used = new Set([target]);
+
+      activeFishes.forEach(f => {
+        if (f === targetFish) {
+          f.value = target;
+          f.isCorrect = true;
+        } else {
+          f.isCorrect = false;
+          let distractor;
+          let attempts = 0;
+          do {
+            const step = (Math.floor(Math.random() * 5) - 2) * currentEquation.factorA;
+            distractor = target + (step !== 0 ? step : (Math.random() > 0.5 ? 4 : -4));
+            if (distractor <= 0) distractor = Math.floor(Math.random() * 80) + 2;
+            attempts++;
+          } while ((distractor === target || used.has(distractor)) && attempts < 30);
+
+          used.add(distractor);
+          f.value = distractor;
+        }
+      });
+    }
+
+    // Per-frame Failsafe Watchdog: 100% mathematically guarantees the correct fish is present
+    function enforceFishEcosystemWatchdog() {
+      if (isBossFightActive) {
+        if (currentBoss && !currentBoss.answers.some(a => a.isTarget && a.value === currentEquation.answer)) {
+          prepareBossAnswers();
+        }
+        return;
+      }
+
+      // Check if we need to clean up hooked or fled fish
+      const activeCount = fishes.filter(f => !f.isHooked && !f.isFleeing).length;
+      const targetFleet = logicalWidth < 640 ? 5 : 7;
+      if (activeCount < targetFleet) {
+        const s = SPECIES_DATABASE[Math.floor(Math.random() * SPECIES_DATABASE.length)];
+        const side = Math.random() > 0.5 ? 1 : -1;
+        const newFish = new Fish(s, side);
+        fishes.push(newFish);
+      }
+
+      // WATCHDOG CHECK: Does at least one active fish have the current correct answer?
+      const hasCorrect = fishes.some(f => !f.isHooked && !f.isFleeing && f.isCorrect && f.value === currentEquation.answer);
+      if (!hasCorrect) {
+        // Find visible active fish and forcefully designate it as the correct answer
+        const visibleActive = fishes.filter(f => !f.isHooked && !f.isFleeing && f.x > 30 && f.x < logicalWidth - 30);
+        const candidate = visibleActive.length > 0 ? visibleActive[0] : fishes.find(f => !f.isHooked && !f.isFleeing);
+        if (candidate) {
+          candidate.value = currentEquation.answer;
+          candidate.isCorrect = true;
+        }
+      }
+    }
+  </script>
+
+  <!-- GAMEPLAY & 2-MISTAKES STRICT CONTROLLER -->
+  <script>
+    function updateLivesDisplay() {
+      const el = document.getElementById('hud-lives');
+      const warningStrip = document.getElementById('warning-strip');
+
+      if (lives === 2) {
+        el.textContent = '❤️❤️';
+        warningStrip.classList.add('hidden');
+      } else if (lives === 1) {
+        el.textContent = '❤️🖤';
+        warningStrip.classList.remove('hidden');
+      } else {
+        el.textContent = '🖤🖤';
+        warningStrip.classList.add('hidden');
+      }
+    }
+
+    // STRICT 2-MISTAKES RULE
+    function registerMistake() {
+      lives--;
+      currentStreak = 0;
+      speedMultiplier = 1.0;
+      document.getElementById('speed-banner').classList.add('scale-0');
+      document.getElementById('hud-streak').textContent = '0';
+      updateLivesDisplay();
+
+      if (lives === 1) {
+        sound.playMistake();
+        showToast("⚠️ Pozor! Vlasec je načatý, zbývá POSLEDNÍ POKUS!", true);
+      } else if (lives <= 0) {
+        triggerGameOver();
+      }
+    }
+
+    function triggerGameOver() {
+      sound.playGameOver();
+      document.getElementById('go-catches').textContent = totalCatches;
+      document.getElementById('go-streak').textContent = maxStreak;
+      document.getElementById('go-location').textContent = `${EXPEDITIONS[currentExpeditionIndex].id}. ${EXPEDITIONS[currentExpeditionIndex].name}`;
+      document.getElementById('modal-gameover').classList.remove('hidden');
+    }
+
+    function setupExpedition(index) {
+      currentExpeditionIndex = index;
+      const exp = EXPEDITIONS[index];
+      isBossFightActive = false;
+      currentBoss = null;
+      missionCatches = 0;
+      speedMultiplier = 1.0;
+
+      document.getElementById('hud-location-icon').textContent = exp.icon;
+      document.getElementById('hud-location-name').textContent = `${exp.id}. ${exp.name}`;
+      document.getElementById('hud-mission-progress').textContent = `Úlovek: 0 / ${exp.requiredCatches}`;
+      document.getElementById('expedition-badge-icon').textContent = exp.icon;
+      document.getElementById('expedition-status-text').textContent = `Lov k Bossovi: 0 / ${exp.requiredCatches}`;
+      document.getElementById('boss-hud').classList.add('hidden');
+      document.getElementById('speed-banner').classList.add('scale-0');
+
+      // Populate fleet of fishes spaced across canvas
+      fishes = [];
+      const fleetSize = logicalWidth < 640 ? 5 : 7;
+      for (let i = 0; i < fleetSize; i++) {
+        const s = SPECIES_DATABASE[i % SPECIES_DATABASE.length];
+        const initialX = (logicalWidth / fleetSize) * (i + 0.5);
+        const fish = new Fish(s, i % 2 === 0 ? 1 : -1, initialX);
+        fishes.push(fish);
+      }
+
+      generateNewEquation();
+    }
+
+    function triggerBossFight() {
+      isBossFightActive = true;
+      fishes.forEach(f => f.flee());
+
+      const exp = EXPEDITIONS[currentExpeditionIndex];
+      currentBoss = new BossCreature(exp.boss);
+
+      document.getElementById('boss-hud-name').textContent = `👑 ${exp.boss.name}`;
+      document.getElementById('boss-hud-stamina-text').textContent = `Výdrž: ${currentBoss.stamina} / ${currentBoss.maxStamina}`;
+      document.getElementById('boss-stamina-bar').style.width = '100%';
+      document.getElementById('boss-hud').classList.remove('hidden');
+      document.getElementById('expedition-status-text').textContent = `SOUBOJ S BOSSEM!`;
+
+      sound.playSplash();
+      showToast(`👑 Vynořil se ${exp.boss.name}!`, false);
+      generateNewEquation();
+    }
+
+    function handleBossDefeated() {
+      sound.playCatch();
+      document.getElementById('boss-hud').classList.add('hidden');
+      isBossFightActive = false;
+
+      if (currentExpeditionIndex < EXPEDITIONS.length - 1) {
+        showBriefing(currentExpeditionIndex + 1);
+      } else {
+        // Complete campaign victory
+        document.getElementById('win-catches').textContent = `${totalCatches} ryb`;
+        document.getElementById('win-streak').textContent = maxStreak;
+        document.getElementById('modal-victory').classList.remove('hidden');
+      }
+    }
+
+    function showBriefing(index) {
+      const exp = EXPEDITIONS[index];
+      currentExpeditionIndex = index;
+
+      document.getElementById('brief-icon').textContent = exp.icon;
+      document.getElementById('brief-title').textContent = `Výprava ${exp.id}: ${exp.name}`;
+      document.getElementById('brief-desc').textContent = exp.description;
+      document.getElementById('brief-target').textContent = `Ulov ${exp.requiredCatches} ryb k Bossovi`;
+      document.getElementById('brief-tables').textContent = `${exp.tables.join(', ')}`;
+      document.getElementById('brief-boss-name').textContent = exp.boss.name;
+      document.getElementById('brief-boss-desc').textContent = exp.boss.description;
+
+      document.getElementById('modal-mission').classList.remove('hidden');
+    }
+  </script>
+
+  <!-- TOUCH AND POINTER HANDLING -->
+  <script>
+    function handlePointerAction(clientX, clientY) {
+      if (lives <= 0 || !document.getElementById('modal-mission').classList.contains('hidden') ||
+          !document.getElementById('modal-gameover').classList.contains('hidden') ||
+          !document.getElementById('modal-victory').classList.contains('hidden') ||
+          !document.getElementById('modal-journal').classList.contains('hidden')) {
+        return;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+
+      sound.init();
+      sound.playCast();
+      castAnimation = { targetX: x, targetY: y, progress: 0 };
+
+      // 1. BOSS FIGHT HIT DETECTION
+      if (isBossFightActive && currentBoss) {
+        const hitBubble = currentBoss.checkHit(x, y);
+        if (hitBubble) {
+          if (hitBubble.isTarget) {
+            sound.playBossHit();
+            sound.playSplash();
+            currentBoss.stamina--;
+            totalCatches++;
+            currentStreak++;
+            if (currentStreak > maxStreak) maxStreak = currentStreak;
+            document.getElementById('hud-streak').textContent = currentStreak;
+
+            const pct = Math.max(0, (currentBoss.stamina / currentBoss.maxStamina) * 100);
+            document.getElementById('boss-stamina-bar').style.width = `${pct}%`;
+            document.getElementById('boss-hud-stamina-text').textContent = `Výdrž: ${currentBoss.stamina} / ${currentBoss.maxStamina}`;
+
+            if (currentBoss.stamina <= 0) {
+              handleBossDefeated();
+            } else {
+              showToast("Skvělý zásah! Boss slábne!", false);
+              generateNewEquation();
+            }
+          } else {
+            // Mistake during Boss Battle -> Strict rule applies
+            registerMistake();
+          }
+        }
+        return;
+      }
+
+      // 2. REGULAR SWIMMING FISH HIT DETECTION
+      let hitFish = null;
+      for (let i = fishes.length - 1; i >= 0; i--) {
+        if (fishes[i].contains(x, y)) {
+          hitFish = fishes[i];
+          break;
+        }
+      }
+
+      if (hitFish) {
+        sound.playSplash();
+
+        if (hitFish.isCorrect) {
+          // CORRECT ANSWER HIT
+          sound.playCatch();
+          totalCatches++;
+          missionCatches++;
+          currentStreak++;
+          if (currentStreak > maxStreak) maxStreak = currentStreak;
+          caughtLog[hitFish.species.id]++;
+
+          hitFish.isHooked = true;
+
+          // 5+ Streak River acceleration
+          if (currentStreak >= 5) {
+            speedMultiplier = 1.8;
+            document.getElementById('speed-banner').classList.remove('scale-0');
+          } else {
+            speedMultiplier = 1.0;
+            document.getElementById('speed-banner').classList.add('scale-0');
+          }
+
+          const exp = EXPEDITIONS[currentExpeditionIndex];
+          document.getElementById('hud-streak').textContent = currentStreak;
+          document.getElementById('hud-mission-progress').textContent = `Úlovek: ${missionCatches} / ${exp.requiredCatches}`;
+          document.getElementById('expedition-status-text').textContent = `Lov k Bossovi: ${missionCatches} / ${exp.requiredCatches}`;
+
+          showToast(`Uloven ${hitFish.species.name} (${hitFish.lengthCm} cm)!`, false);
+
+          if (missionCatches >= exp.requiredCatches) {
+            setTimeout(triggerBossFight, 750);
+          } else {
+            setTimeout(() => {
+              fishes = fishes.filter(f => !f.isHooked);
+              generateNewEquation();
+            }, 450);
+          }
+
+        } else {
+          // WRONG ANSWER HIT
+          // Rule: Flee the wrong fish, KEEP current equation and KEEP correct fish in water
+          hitFish.flee();
+          registerMistake();
+        }
+      }
+    }
+
+    // Touch events for immediate response without mobile 300ms delays
+    let touchMoved = false;
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      touchMoved = false;
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', () => {
+      touchMoved = true;
+    }, { passive: true });
+
+    canvas.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      if (!touchMoved && e.changedTouches.length > 0) {
+        handlePointerAction(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('mousedown', (e) => {
+      handlePointerAction(e.clientX, e.clientY);
+    });
+
+    // Expedition modal button
+    document.getElementById('btn-start-mission').addEventListener('click', () => {
+      document.getElementById('modal-mission').classList.add('hidden');
+      setupExpedition(currentExpeditionIndex);
+    });
+
+    // REQ 3: "Chci na další výpravu" buttons handler
+    document.getElementById('btn-gameover-restart').addEventListener('click', () => {
+      document.getElementById('modal-gameover').classList.add('hidden');
+      lives = 2;
+      currentStreak = 0;
+      totalCatches = 0;
+      lastEquationFactors = null;
+      updateLivesDisplay();
+      showBriefing(0);
+    });
+
+    document.getElementById('btn-win-restart').addEventListener('click', () => {
+      document.getElementById('modal-victory').classList.add('hidden');
+      lives = 2;
+      currentStreak = 0;
+      totalCatches = 0;
+      lastEquationFactors = null;
+      updateLivesDisplay();
+      showBriefing(0);
+    });
+
+    // Atlas Modal
+    function openFishJournal() {
+      const grid = document.getElementById('journal-grid');
+      grid.innerHTML = '';
+
+      SPECIES_DATABASE.forEach(fish => {
+        const count = caughtLog[fish.id] || 0;
+        const card = document.createElement('div');
+        card.className = `p-2.5 sm:p-3 rounded-2xl border flex items-start gap-2.5 ${count > 0 ? 'bg-white border-amber-300 shadow-sm' : 'bg-slate-100 border-dashed border-slate-300 opacity-60'}`;
+        card.innerHTML = `
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${count > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-400'}" style="border: 1.5px solid ${count > 0 ? fish.color : '#cbd5e1'}">
+            <span class="text-xl">${count > 0 ? '🐟' : '❓'}</span>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex justify-between items-center gap-1">
+              <h4 class="font-bold text-slate-800 text-xs sm:text-sm truncate">${fish.name}</h4>
+              <span class="text-[10px] font-bold px-1.5 py-0.2 rounded-full ${count > 0 ? 'bg-emerald-600 text-white' : 'bg-slate-300 text-slate-600'}">
+                ${count > 0 ? `${count}×` : 'Neuloven'}
+              </span>
+            </div>
+            <div class="text-[9px] text-slate-500 italic">${fish.scientific} (${fish.minLen}–${fish.maxLen} cm)</div>
+            <p class="text-[11px] text-slate-600 mt-0.5 leading-snug">${count > 0 ? fish.fact : 'Vyřeš správně násobilku k ulovení!'}</p>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+
+      document.getElementById('modal-journal').classList.remove('hidden');
+    }
+
+    document.getElementById('btn-journal').addEventListener('click', openFishJournal);
+    document.getElementById('btn-win-journal').addEventListener('click', () => {
+      document.getElementById('modal-victory').classList.add('hidden');
+      openFishJournal();
+    });
+    document.getElementById('btn-close-journal').addEventListener('click', () => {
+      document.getElementById('modal-journal').classList.add('hidden');
+    });
+
+    document.getElementById('btn-mute').addEventListener('click', () => {
+      const isMuted = sound.toggleMute();
+      document.getElementById('btn-mute').textContent = isMuted ? '🔇' : '🔊';
+    });
+  </script>
+
+  <!-- RENDERING LOOP -->
+  <script>
+    function renderEnvironment() {
+      const theme = EXPEDITIONS[currentExpeditionIndex].theme;
+
+      // 1. Water color gradient
+      const grad = ctx.createLinearGradient(0, 0, 0, logicalHeight);
+      if (theme === 'pond') {
+        grad.addColorStop(0, '#0284c7');
+        grad.addColorStop(0.5, '#0e7490');
+        grad.addColorStop(1, '#064e3b');
+      } else if (theme === 'river') {
+        grad.addColorStop(0, '#0369a1');
+        grad.addColorStop(0.5, '#0d9488');
+        grad.addColorStop(1, '#115e59');
+      } else if (theme === 'night') {
+        grad.addColorStop(0, '#0b1120');
+        grad.addColorStop(0.4, '#1e1b4b');
+        grad.addColorStop(1, '#020617');
+      } else {
+        grad.addColorStop(0, '#1e293b');
+        grad.addColorStop(0.5, '#0f766e');
+        grad.addColorStop(1, '#042f2e');
+      }
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, logicalWidth, logicalHeight);
+
+      // 2. Underwater sunlight / moonlight shafts
+      ctx.save();
+      ctx.globalAlpha = theme === 'night' ? 0.04 : 0.07;
+      ctx.fillStyle = theme === 'night' ? '#93c5fd' : '#ffffff';
+      waterWaveOffset += 0.02 * speedMultiplier;
+      for (let i = 0; i < 4; i++) {
+        const offset = (i * 240 + waterWaveOffset * 25) % (logicalWidth + 300) - 150;
+        ctx.beginPath();
+        ctx.moveTo(offset, 0);
+        ctx.lineTo(offset + 70, 0);
+        ctx.lineTo(offset + 200, logicalHeight);
+        ctx.lineTo(offset + 40, logicalHeight);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // 3. Riverbed plants
+      ctx.strokeStyle = theme === 'night' ? '#1e3a5f' : '#14532d';
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      for (let i = 20; i < logicalWidth; i += 65) {
+        const plantH = 45 + (i % 5) * 12;
+        const sway = Math.sin(waterWaveOffset + i) * 12;
+        ctx.beginPath();
+        ctx.moveTo(i, logicalHeight - 8);
+        ctx.quadraticCurveTo(i + sway * 0.5, logicalHeight - plantH * 0.5, i + sway, logicalHeight - plantH);
+        ctx.stroke();
+      }
+    }
+
+    function renderFishingLine() {
+      if (!castAnimation) return;
+
+      castAnimation.progress += 0.08;
+      const originX = logicalWidth * 0.5;
+      const originY = -5;
+      const curX = originX + (castAnimation.targetX - originX) * Math.min(1, castAnimation.progress);
+      const curY = originY + (castAnimation.targetY - originY) * Math.min(1, castAnimation.progress);
+
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 2]);
+      ctx.beginPath();
+      ctx.moveTo(originX, originY);
+      ctx.lineTo(curX, curY);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.arc(curX, curY, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      if (castAnimation.progress >= 1.2) {
+        castAnimation = null;
+      }
+    }
+
+    function gameLoop() {
+      ctx.clearRect(0, 0, logicalWidth, logicalHeight);
+
+      renderEnvironment();
+
+      if (isBossFightActive && currentBoss) {
+        currentBoss.update();
+        currentBoss.draw(ctx);
+      } else {
+        for (let i = fishes.length - 1; i >= 0; i--) {
+          const f = fishes[i];
+          f.update();
+          f.draw(ctx);
+
+          if (f.isHooked && f.y < -f.baseHeight) {
+            fishes.splice(i, 1);
+          } else if (f.isFleeing && (f.x < -f.baseWidth - 50 || f.x > logicalWidth + f.baseWidth + 50)) {
+            fishes.splice(i, 1);
+          }
+        }
+
+        enforceFishEcosystemWatchdog();
+      }
+
+      renderFishingLine();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    window.onload = function() {
+      resize();
+      updateLivesDisplay();
+      showBriefing(0);
+      requestAnimationFrame(gameLoop);
+    };
+  </script>
+</body>
+</html>
