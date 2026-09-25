@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Žofinčina zahrada · EN/CZ Vocabulary Quiz</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="app-header">
+    <h1>🦔 Žofinčina zahrada</h1>
+    <p class="subtitle">Pomoz ježečce Žofince nasbírat slovíčka na zimu</p>
+  </header>
+
+  <!-- SETUP SCREEN -->
+  <section id="screen-setup" class="screen active">
+
+    <div class="setup-block">
+      <h2><span class="step-num">1</span> Choose topics</h2>
+      <div id="topic-grid" class="topic-grid"></div>
+      <div class="topic-actions">
+        <button type="button" id="btn-select-all" class="link-btn">Select all</button>
+        <button type="button" id="btn-select-none" class="link-btn">Clear</button>
+      </div>
+    </div>
+
+    <div class="setup-block">
+      <h2><span class="step-num">2</span> Quiz type</h2>
+      <div class="option-row" id="mode-options">
+        <label class="option-card">
+          <input type="radio" name="mode" value="multiple" checked>
+          <span class="option-icon">🍄</span>
+          <span>Forage (multiple choice)</span>
+        </label>
+        <label class="option-card">
+          <input type="radio" name="mode" value="typed">
+          <span class="option-icon">🍂</span>
+          <span>Whisper (typed answer)</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="setup-block">
+      <h2><span class="step-num">3</span> Direction</h2>
+      <div class="option-row" id="direction-options">
+        <label class="option-card">
+          <input type="radio" name="direction" value="mixed" checked>
+          <span class="option-icon">🔀</span>
+          <span>Mixed</span>
+        </label>
+        <label class="option-card">
+          <input type="radio" name="direction" value="en-cz">
+          <span class="option-icon">🇬🇧→🇨🇿</span>
+          <span>EN → CZ</span>
+        </label>
+        <label class="option-card">
+          <input type="radio" name="direction" value="cz-en">
+          <span class="option-icon">🇨🇿→🇬🇧</span>
+          <span>CZ → EN</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="setup-block">
+      <h2><span class="step-num">4</span> Round length</h2>
+      <div class="option-row" id="length-options">
+        <label class="option-card">
+          <input type="radio" name="length" value="10" checked>
+          <span>10</span>
+        </label>
+        <label class="option-card">
+          <input type="radio" name="length" value="20">
+          <span>20</span>
+        </label>
+        <label class="option-card">
+          <input type="radio" name="length" value="all">
+          <span>All words</span>
+        </label>
+      </div>
+    </div>
+
+    <p id="setup-error" class="error-msg" hidden>Pick at least one topic to start.</p>
+    <button id="btn-start" class="btn btn-primary btn-big">Start the walk ▶</button>
+    <p class="high-score">🏆 High score: <span id="high-score-value">0</span></p>
+  </section>
+
+  <!-- QUIZ SCREEN -->
+  <section id="screen-quiz" class="screen">
+    <div class="hud">
+      <div class="hud-item" id="hud-progress">Question 1 / 10</div>
+      <div class="hud-item" id="hud-score">⭐ <span id="hud-score-value">0</span></div>
+      <div class="hud-item" id="hud-streak">🔥 <span id="hud-streak-value">0</span></div>
+      <div class="hud-item hud-lives" id="hud-lives"></div>
+    </div>
+    <div class="path-track">
+      <div id="progress-fill" class="path-fill"></div>
+      <div id="path-marker" class="path-marker">🦔</div>
+    </div>
+
+    <div class="scene" id="scene">
+      <div class="scene-sky">
+        <span class="firefly"></span><span class="firefly"></span><span class="firefly"></span>
+        <span class="firefly"></span><span class="firefly"></span>
+        <span class="moon">🌙</span>
+      </div>
+
+      <div class="question-panel">
+        <div class="question-meta">
+          <span id="question-topic-icon"></span>
+          <span id="question-topic-name"></span>
+          <span class="question-direction" id="question-direction"></span>
+        </div>
+        <div class="question-word" id="question-word">…</div>
+      </div>
+
+      <div class="mascot-wrap" id="mascot-wrap">
+        <div class="mascot-bubble" id="mascot-bubble" hidden></div>
+        <div class="mascot idle" id="mascot">🦔</div>
+        <div class="mascot-shadow"></div>
+      </div>
+
+      <div id="meadow" class="meadow"></div>
+
+      <div id="answer-area-typed" class="answer-area typed-area" hidden>
+        <input type="text" id="typed-input" class="typed-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Whisper the translation…">
+        <button id="btn-submit-typed" class="btn btn-primary">Tell Žofinka ↵</button>
+      </div>
+    </div>
+
+    <div id="feedback" class="feedback" hidden></div>
+    <button id="btn-next" class="btn btn-secondary btn-next" hidden>Continue the walk →</button>
+  </section>
+
+  <!-- RESULT SCREEN -->
+  <section id="screen-result" class="screen">
+    <div class="result-mascot" id="result-mascot">🦔</div>
+    <h2 id="result-title">Round complete! 🎉</h2>
+    <p class="result-story" id="result-story"></p>
+    <div class="result-stats">
+      <div class="stat">
+        <span class="stat-value" id="result-score">0</span>
+        <span class="stat-label">Acorns</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="result-accuracy">0%</span>
+        <span class="stat-label">Accuracy</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="result-best-streak">0</span>
+        <span class="stat-label">Best streak</span>
+      </div>
+    </div>
+    <p id="result-newhigh" class="new-high" hidden>🎉 New high score!</p>
+    <div class="result-actions">
+      <button id="btn-play-again" class="btn btn-primary">Play again ↻</button>
+      <button id="btn-change-settings" class="btn btn-secondary">Change settings ⚙</button>
+    </div>
+  </section>
+
+</div>
+
+<script src="data.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
